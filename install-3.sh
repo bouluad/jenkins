@@ -17,13 +17,12 @@ fi
 # Iterate over each plugin in the JSON file
 for PLUGIN in $(jq -r 'keys[]' $PLUGIN_FILE)
 do
-    VERSION=$(jq -r --arg PLUGIN "$PLUGIN" '.[$PLUGIN]' $PLUGIN_FILE)
-    echo "Installing plugin $PLUGIN version $VERSION..."
-    
-    # Step 1: Initiate Plugin Installation
+    echo "Installing plugin $PLUGIN..."
+
+    # Step 1: Initiate Plugin Installation (Latest Version)
     curl -X POST "$JENKINS_URL/pluginManager/installNecessaryPlugins" \
         --user $USER:$API_TOKEN \
-        --data "<jenkins><install plugin='$PLUGIN@$VERSION' /></jenkins>" \
+        --data "<jenkins><install plugin='$PLUGIN@latest' /></jenkins>" \
         -H "Content-Type: text/xml"
 
     # Step 2: Verify Plugin Installation Status
@@ -32,10 +31,10 @@ do
     do
         INSTALLED=$(curl -s "$JENKINS_URL/pluginManager/api/json?depth=1" \
                     --user $USER:$API_TOKEN | \
-                    jq -r ".plugins[] | select(.shortName==\"$PLUGIN\") | .version")
+                    jq -r ".plugins[] | select(.shortName==\"$PLUGIN\") | .active")
 
-        if [ "$INSTALLED" == "$VERSION" ]; then
-            echo "Plugin $PLUGIN version $VERSION is installed."
+        if [ "$INSTALLED" == "true" ]; then
+            echo "Plugin $PLUGIN is installed."
             break
         else
             echo "Plugin $PLUGIN is not yet installed. Checking again in $STATUS_CHECK_INTERVAL seconds..."
@@ -44,7 +43,7 @@ do
         sleep $STATUS_CHECK_INTERVAL
     done
 
-    if [ "$INSTALLED" != "$VERSION" ]; then
+    if [ "$INSTALLED" != "true" ]; then
         echo "Plugin $PLUGIN installation could not be verified within the allowed time."
         exit 1
     fi
