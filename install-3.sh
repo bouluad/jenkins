@@ -29,12 +29,15 @@ do
     echo "Verifying plugin $PLUGIN installation status..."
     for ((i=1; i<=MAX_ATTEMPTS; i++))
     do
-        INSTALLED=$(curl -s "$JENKINS_URL/pluginManager/api/json?depth=1" \
+        PLUGIN_INFO=$(curl -s "$JENKINS_URL/pluginManager/api/json?depth=1" \
                     --user $USER:$API_TOKEN | \
-                    jq -r ".plugins[] | select(.shortName==\"$PLUGIN\") | .active")
+                    jq -r ".plugins[] | select(.shortName==\"$PLUGIN\")")
+
+        INSTALLED=$(echo "$PLUGIN_INFO" | jq -r ".active")
+        VERSION=$(echo "$PLUGIN_INFO" | jq -r ".version")
 
         if [ "$INSTALLED" == "true" ]; then
-            echo "Plugin $PLUGIN is installed."
+            echo "Plugin $PLUGIN is installed with version $VERSION."
             break
         else
             echo "Plugin $PLUGIN is not yet installed. Checking again in $STATUS_CHECK_INTERVAL seconds..."
