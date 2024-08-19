@@ -1,13 +1,32 @@
-import jenkins.model.*
+// Import necessary Jenkins classes
+import jenkins.model.Jenkins
 import hudson.util.Secret
-import com.cloudbees.plugins.credentials.*
-import com.cloudbees.plugins.credentials.common.*
-import com.cloudbees.plugins.credentials.domains.*
-import com.cloudbees.jenkins.plugins.sshcredentials.impl.*
+
+// Import Credentials classes
+import com.cloudbees.plugins.credentials.Credentials
+import com.cloudbees.plugins.credentials.CredentialsProvider
+import com.cloudbees.plugins.credentials.domains.Domain
+
+// Import specific credential implementations
+import com.cloudbees.plugins.credentials.impl.UsernamePasswordCredentialsImpl
+import com.cloudbees.plugins.credentials.impl.StringCredentialsImpl
+import com.cloudbees.plugins.credentials.impl.CertificateCredentialsImpl
+import com.cloudbees.jenkins.plugins.sshcredentials.impl.BasicSSHUserPrivateKey
+import com.cloudbees.plugins.credentials.impl.BaseStandardCredentials
+
+// Import AWS Credentials if AWS Credentials Plugin is installed
+import com.cloudbees.jenkins.plugins.awscredentials.AWSCredentialsImpl
+
+// Import Docker Credentials if Docker Plugin is installed
+import com.nirima.jenkins.plugins.docker.utils.DockerServerCredentials
+
+// Import Google OAuth Credentials if Google OAuth Plugin is installed
+import com.google.jenkins.plugins.credentials.oauth.GoogleRobotPrivateKeyCredentials
 
 // Define a map to store all credentials
 def credentialsMap = [:]
 
+// Fetch all credentials from Jenkins
 def creds = CredentialsProvider.lookupCredentials(
     Credentials.class,
     Jenkins.instance,
@@ -17,40 +36,57 @@ def creds = CredentialsProvider.lookupCredentials(
 
 creds.each { c ->
     def credentialData = [:]
-    credentialData['type'] = c.getClass().getSimpleName()
+    credentialData['type'] = c.getClass().getName()
 
-    if (c instanceof UsernamePasswordCredentialsImpl) {
-        credentialData['username'] = c.username
-        credentialData['password'] = Secret.toString(c.password)
-    } else if (c instanceof StringCredentialsImpl) {
-        credentialData['secret'] = Secret.toString(c.secret)
-    } else if (c instanceof BasicSSHUserPrivateKey) {
-        credentialData['username'] = c.username
-        credentialData['privateKey'] = c.privateKey
-        if (c.passphrase) {
-            credentialData['passphrase'] = Secret.toString(c.passphrase)
-        }
-    } else if (c instanceof CertificateCredentialsImpl) {
-        credentialData['alias'] = c.keyStoreSource.keyStoreAlias
-        credentialData['password'] = Secret.toString(c.password)
-        credentialData['certificate'] = "(binary content)" // Handle binary content appropriately
-    } else if (c instanceof AWSCredentialsImpl) {
-        credentialData['accessKey'] = c.accessKey
-        credentialData['secretKey'] = Secret.toString(c.secretKey)
-    } else if (c instanceof DockerServerCredentials) {
-        credentialData['username'] = c.username
-        credentialData['password'] = Secret.toString(c.password)
-        credentialData['email'] = c.email
-        credentialData['serverAddress'] = c.serverAddress
-    } else if (c instanceof GoogleRobotPrivateKeyCredentials) {
-        credentialData['accountId'] = c.accountId
-        credentialData['privateKey'] = "(private key not displayed)"
-    } else {
-        credentialData['unsupportedType'] = true
+    switch(c) {
+        case { it instanceof UsernamePasswordCredentialsImpl }:
+            credentialData['username'] = c.username
+            credentialData['password'] = Secret.toString(c.password)
+            break
+
+        case { it instanceof StringCredentialsImpl }:
+            credentialData['secret'] = Secret.toString(c.secret)
+            break
+
+        case { it instanceof BasicSSHUserPrivateKey }:
+            credentialData['username'] = c.username
+            credentialData['privateKey'] = c.privateKey
+            credentialData['passphrase'] = c.passphrase ? Secret.toString(c.passphrase) : null
+            break
+
+        case { it instanceof CertificateCredentialsImpl }:
+            credentialData['alias'] = c.keyStoreSource?.keyStoreAlias
+            credentialData['password'] = Secret.toString(c.password)
+            credentialData['certificate'] = c.keyStoreSource?.getKeyStore()?.toString() ?: "(binary content)"
+            break
+
+        case { it instanceof AWSCredentialsImpl }:
+            credentialData['accessKey'] = c.accessKey
+            credentialData['secretKey'] = Secret.toString(c.secretKey)
+            break
+
+        case { it instanceof DockerServerCredentials }:
+            credentialData['username'] = c.username
+            credentialData['password'] = Secret.toString(c.password)
+            credentialData['email'] = c.email
+            credentialData['serverAddress'] = c.serverAddress
+            break
+
+        case { it instanceof GoogleRobotPrivateKeyCredentials }:
+            credentialData['accountId'] = c.accountId
+            credentialData['privateKey'] = c.getPrivateKey()
+            break
+
+        default:
+            credentialData['unsupportedType'] = true
+            break
     }
 
     credentialsMap[c.id] = credentialData
 }
 
-// Print the dictionary as a string
-println(credentialsMap)
+// Convert the credentials map to JSON for easy readability and transfer
+def jsonOutput = groovy.json.JsonOutput.toJson(credentialsMap)
+
+// Print the JSON output
+println(jsonOutput)
