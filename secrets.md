@@ -35,3 +35,22 @@ Paste the above script into the console and execute it.
 Copy the Output:
 
 The script will output a JSON string representing all your credentials. Copy this output and save it securely.
+
+---------------------
+Instructions to Use the Import Script
+Access Jenkins Script Console:
+
+Navigate to http://your-new-jenkins-instance/script.
+Paste the Script:
+
+Copy and paste the above script into the console.
+Insert JSON Data:
+
+Replace the jsonString content with the JSON output you obtained from the export script.
+Execute the Script:
+
+Run the script. It will iterate through each credential in the JSON data and add it to the Jenkins credentials store.
+Verify Import:
+
+Go to Credentials in the Jenkins UI and verify that all credentials have been imported correctly.
+
