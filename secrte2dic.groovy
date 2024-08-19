@@ -1,67 +1,56 @@
 import jenkins.model.*
 import hudson.util.Secret
 import com.cloudbees.plugins.credentials.*
-import com.cloudbees.plugins.credentials.impl.*
+import com.cloudbees.plugins.credentials.common.*
 import com.cloudbees.plugins.credentials.domains.*
+import com.cloudbees.jenkins.plugins.sshcredentials.impl.*
 
-// The dictionary of credentials to be imported
-def credentialsMap = [
-  'credential-1': [
-    type: 'UsernamePasswordCredentialsImpl',
-    username: 'user1',
-    password: 'password1'
-  ],
-  'credential-2': [
-    type: 'StringCredentialsImpl',
-    secret: 'secretTextValue'
-  ],
-  'credential-3': [
-    type: 'BasicSSHUserPrivateKey',
-    username: 'sshUser',
-    privateKey: 'privateKeyData',
-    passphrase: 'optionalPassphrase'
-  ],
-  // ... more credentials
-]
+// Define a map to store all credentials
+def credentialsMap = [:]
 
-// Get the credentials store
-def domain = Domain.global()
-def store = Jenkins.instance.getExtensionList('com.cloudbees.plugins.credentials.SystemCredentialsProvider')[0]?.getStore()
+def creds = CredentialsProvider.lookupCredentials(
+    Credentials.class,
+    Jenkins.instance,
+    null,
+    null
+)
 
-// Iterate through the dictionary and create credentials in Jenkins
-credentialsMap.each { id, data ->
-    if (data.type == 'UsernamePasswordCredentialsImpl') {
-        def credentials = new UsernamePasswordCredentialsImpl(CredentialsScope.GLOBAL, id, null, data.username, data.password)
-        store.addCredentials(domain, credentials)
-    } else if (data.type == 'StringCredentialsImpl') {
-        def credentials = new StringCredentialsImpl(CredentialsScope.GLOBAL, id, null, Secret.fromString(data.secret))
-        store.addCredentials(domain, credentials)
-    } else if (data.type == 'BasicSSHUserPrivateKey') {
-        def credentials = new BasicSSHUserPrivateKey(
-            CredentialsScope.GLOBAL,
-            id,
-            data.username,
-            new BasicSSHUserPrivateKey.DirectEntryPrivateKeySource(data.privateKey),
-            data.passphrase ? Secret.fromString(data.passphrase) : null,
-            null
-        )
-        store.addCredentials(domain, credentials)
-    } else if (data.type == 'AWSCredentialsImpl') {
-        def credentials = new AWSCredentialsImpl(CredentialsScope.GLOBAL, id, data.accessKey, data.secretKey, null)
-        store.addCredentials(domain, credentials)
-    } else if (data.type == 'DockerServerCredentials') {
-        def credentials = new DockerServerCredentials(
-            CredentialsScope.GLOBAL,
-            id,
-            data.username,
-            Secret.fromString(data.password),
-            data.email,
-            data.serverAddress
-        )
-        store.addCredentials(domain, credentials)
+creds.each { c ->
+    def credentialData = [:]
+    credentialData['type'] = c.getClass().getSimpleName()
+
+    if (c instanceof UsernamePasswordCredentialsImpl) {
+        credentialData['username'] = c.username
+        credentialData['password'] = Secret.toString(c.password)
+    } else if (c instanceof StringCredentialsImpl) {
+        credentialData['secret'] = Secret.toString(c.secret)
+    } else if (c instanceof BasicSSHUserPrivateKey) {
+        credentialData['username'] = c.username
+        credentialData['privateKey'] = c.privateKey
+        if (c.passphrase) {
+            credentialData['passphrase'] = Secret.toString(c.passphrase)
+        }
+    } else if (c instanceof CertificateCredentialsImpl) {
+        credentialData['alias'] = c.keyStoreSource.keyStoreAlias
+        credentialData['password'] = Secret.toString(c.password)
+        credentialData['certificate'] = "(binary content)" // Handle binary content appropriately
+    } else if (c instanceof AWSCredentialsImpl) {
+        credentialData['accessKey'] = c.accessKey
+        credentialData['secretKey'] = Secret.toString(c.secretKey)
+    } else if (c instanceof DockerServerCredentials) {
+        credentialData['username'] = c.username
+        credentialData['password'] = Secret.toString(c.password)
+        credentialData['email'] = c.email
+        credentialData['serverAddress'] = c.serverAddress
+    } else if (c instanceof GoogleRobotPrivateKeyCredentials) {
+        credentialData['accountId'] = c.accountId
+        credentialData['privateKey'] = "(private key not displayed)"
     } else {
-        println("Unsupported credential type for ID: ${id}")
+        credentialData['unsupportedType'] = true
     }
+
+    credentialsMap[c.id] = credentialData
 }
 
-println("Credentials have been successfully imported into Jenkins.")
+// Print the dictionary as a string
+println(credentialsMap)
